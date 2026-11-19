@@ -333,6 +333,71 @@ kbd {
   opacity: 0.8;
 }
 
+/* ---------------- 拾取面板 ---------------- */
+.compare {
+  display: flex;
+  gap: calc(4px * var(--s));
+  align-items: stretch;
+  margin: calc(4px * var(--s)) 0 calc(5px * var(--s));
+}
+.compare .side {
+  flex: 1 1 0;
+  padding: calc(4px * var(--s)) calc(5px * var(--s));
+  background: rgba(13, 11, 20, 0.5);
+  border: 1px solid var(--slate1);
+  text-align: left;
+}
+.compare .side-head {
+  font-size: calc(4.5px * var(--s));
+  letter-spacing: 0.16em;
+  color: var(--brass2);
+  margin-bottom: calc(1px * var(--s));
+  text-transform: uppercase;
+}
+.compare .side-name {
+  font-size: calc(7px * var(--s));
+  letter-spacing: 0.04em;
+  color: var(--bone1);
+  margin-bottom: calc(1px * var(--s));
+}
+.compare .side-desc {
+  font-size: calc(4.8px * var(--s));
+  line-height: 1.4;
+  color: var(--slate4);
+  margin-bottom: calc(2px * var(--s));
+}
+.compare .side-mod {
+  font-size: calc(4.5px * var(--s));
+  color: var(--cyan2);
+  letter-spacing: 0.02em;
+}
+.compare .arrow {
+  align-self: center;
+  font-size: calc(6px * var(--s));
+  font-weight: 600;
+  color: var(--brass1);
+  letter-spacing: 0.1em;
+}
+.pickup-actions {
+  display: flex;
+  flex-direction: column;
+  gap: calc(2px * var(--s));
+  align-items: stretch;
+}
+.pickup-actions .btn { margin-top: 0; width: 100%; text-align: center; }
+.btn.primary {
+  background: linear-gradient(180deg, #d9a54b, #a3722f);
+  color: #1a1510;
+  border-color: #d9a54b;
+}
+.btn.primary:hover { background: linear-gradient(180deg, #e8bd63, #b58134); }
+.btn.ghost {
+  background: transparent;
+  color: var(--slate4);
+  border-color: var(--slate2);
+}
+.btn.ghost:hover { color: var(--bone0); border-color: var(--slate3); background: rgba(86, 76, 107, 0.2); }
+
 /* ---------------- 页脚 ---------------- */
 .foot {
   margin: 0;

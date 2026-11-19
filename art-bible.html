@@ -187,7 +187,7 @@
       <tr><td>受击闪白</td><td>0.09s</td><td>整剪影替换为骨白</td><td>不改轮廓，只改填充</td></tr>
       <tr><td>死亡碎裂</td><td>0.35s</td><td>6–9 粒，向外 9px</td><td>粒子颜色取自该敌人色族</td></tr>
       <tr><td>冲刺预警</td><td>0.65s</td><td>余烬色环脉冲</td><td>预警先于冲刺，绝不省略</td></tr>
-      <tr><td>宝箱开启</td><td>2 帧 + 0.5s 粒子</td><td>箱盖开合</td><td>提示文字用 DOM，不缩放</td></tr>
+      <tr><td>宝箱开启</td><td>2 帧 + 0.28s 落地</td><td>箱盖开合，武器弹出到空地面</td><td>落点必须在完整地面瓦片内；待拾取状态常亮黄铜脉冲环</td></tr>
     </tbody>
   </table>
 </section>
@@ -211,6 +211,20 @@
       <tr><td>弹丸</td><td>6×6</td><td>中心</td><td>2</td><td>×4</td><td>灯芯弹 / 余烬弹</td></tr>
       <tr><td>图标</td><td>16×16</td><td>左上角</td><td>12</td><td>×1</td><td>武器 6 + 属性 6</td></tr>
       <tr><td>HUD 文字</td><td>原生 px</td><td>—</td><td>—</td><td>—</td><td>系统字体，实际 ≥ 14px</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin-top:18px;font-size:14px;letter-spacing:0.06em;color:var(--bone1);">武器熔炼词条 · 每级提升一格</h3>
+  <p class="note">走上去可替换（旧武器留在地上）或熔炼（当前武器 +1 级）；词条随武器类型变化，不跨武器通用。</p>
+  <table class="tbl">
+    <thead><tr><th>武器</th><th>词条 1（+1 级）</th><th>词条 2（+1 级）</th><th>上限</th></tr></thead>
+    <tbody>
+      <tr><td>钟摆刃</td><td>刃弧扩 · 扇形角度 +0.15 rad</td><td>刃锋锐 · 伤害 +1</td><td>10 级</td></tr>
+      <tr><td>灯芯弹</td><td>穿透+ · 多穿透 1 个敌人</td><td>弹芯锐 · 伤害 +1</td><td>10 级</td></tr>
+      <tr><td>余烬扇</td><td>散弹+ · 弹数 +1（上限 6）</td><td>扇面宽 · 散射角 +0.06</td><td>10 级</td></tr>
+      <tr><td>钟锤</td><td>冲击波扩 · 范围半径 +6 px</td><td>锤重沉 · 伤害 +3</td><td>10 级</td></tr>
+      <tr><td>齿环锯</td><td>锯环扩 · 轨道半径 +6 px</td><td>齿锋锐 · 单段伤害 +1</td><td>10 级</td></tr>
+      <tr><td>灯塔棱光</td><td>棱光加粗 · 光束宽度 +2 px</td><td>棱光锐 · 伤害 +2</td><td>10 级</td></tr>
     </tbody>
   </table>
 </section>

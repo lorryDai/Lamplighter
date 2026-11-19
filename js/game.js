@@ -42,33 +42,78 @@
   window.addEventListener('resize', resize);
 
   /* ---------------- 武器 ---------------- */
+  // mod 表：每级 step 增加多少，到 max 封顶；name 用于熔炼词条文案
   var WEAPONS = {
     reaper: {
-      name: '钟摆刃', icon: 'reaper', cd: 0.55, type: 'melee', dmg: 9, range: 34,
-      desc: '近身弧斩，同时命中扇形内全部敌人'
+      name: '钟摆刃', icon: 'reaper', cd: 0.55, type: 'melee', dmg: 9, range: 34, fanAng: 0.85,
+      desc: '近身弧斩，同时命中扇形内全部敌人',
+      mods: [
+        { key: 'fanAng', step: 0.15, max: 1.4, name: '刃弧扩' },
+        { key: 'dmg', step: 1, max: 24, name: '刃锋锐' }
+      ]
     },
     bolt: {
-      name: '灯芯弹', icon: 'bolt', cd: 0.40, type: 'bolt', dmg: 8, speed: 230,
-      desc: '自动瞄准最近敌人，直线弹道'
+      name: '灯芯弹', icon: 'bolt', cd: 0.40, type: 'bolt', dmg: 8, speed: 230, pierce: 0,
+      desc: '自动瞄准最近敌人，直线弹道',
+      mods: [
+        { key: 'pierce', step: 1, max: 4, name: '穿透+' },
+        { key: 'dmg', step: 1, max: 22, name: '弹芯锐' }
+      ]
     },
     fan: {
       name: '余烬扇', icon: 'fan', cd: 0.78, type: 'fan', dmg: 6, speed: 200, count: 3, spread: 0.36,
-      desc: '三向扇形散射，单发伤害较低'
+      desc: '三向扇形散射，单发伤害较低',
+      mods: [
+        { key: 'count', step: 1, max: 6, name: '散弹+' },
+        { key: 'spread', step: 0.06, max: 0.72, name: '扇面宽' }
+      ]
     },
     hammer: {
       name: '钟锤', icon: 'hammer', cd: 1.05, type: 'slam', dmg: 24, radius: 44,
-      desc: '砸地冲击波，范围内敌人全部受创'
+      desc: '砸地冲击波，范围内敌人全部受创',
+      mods: [
+        { key: 'radius', step: 6, max: 68, name: '冲击波扩' },
+        { key: 'dmg', step: 3, max: 60, name: '锤重沉' }
+      ]
     },
     saw: {
       name: '齿环锯', icon: 'saw', type: 'orbit', dmg: 5, orbitR: 27, tick: 0.32,
-      desc: '双锯环绕身旋转，持续切割贴近的敌人'
+      desc: '双锯环绕身旋转，持续切割贴近的敌人',
+      mods: [
+        { key: 'orbitR', step: 6, max: 45, name: '锯环扩' },
+        { key: 'dmg', step: 1, max: 14, name: '齿锋锐' }
+      ]
     },
     beam: {
       name: '灯塔棱光', icon: 'beam', cd: 1.0, type: 'beam', dmg: 15, range: 210, width: 8,
-      desc: '贯穿直线光束，途中敌人全部命中'
+      desc: '贯穿直线光束，途中敌人全部命中',
+      mods: [
+        { key: 'width', step: 2, max: 16, name: '棱光加粗' },
+        { key: 'dmg', step: 2, max: 38, name: '棱光锐' }
+      ]
     }
   };
   var WEAPON_IDS = ['reaper', 'bolt', 'fan', 'hammer', 'saw', 'beam'];
+
+  /* 取某武器在当前等级下生效参数：以 w 为基底，叠加 mod 表 */
+  function eff(w, lvl) {
+    var out = {}, k;
+    for (k in w) out[k] = w[k];
+    if (!w.mods || !lvl) return out;
+    for (var i = 0; i < w.mods.length; i++) {
+      var m = w.mods[i];
+      out[m.key] = Math.min(out[m.key] + m.step * lvl, m.max);
+    }
+    return out;
+  }
+
+  /* 武器当前熔炼词条描述（仅显示超过 0 的） */
+  function weaponUpgradeText(w, lvl) {
+    if (!lvl) return '—';
+    var lines = [];
+    for (var i = 0; i < w.mods.length; i++) lines.push('+' + lvl + ' ' + w.mods[i].name);
+    return lines.join(' · ');
+  }
 
   /* ---------------- 敌人模板 ---------------- */
   var ENEMY = {
@@ -90,9 +135,10 @@
   /* ---------------- 状态 ---------------- */
   var G = {
     state: 'title', level: 1, t: 0, shake: 0,
-    spawned: 0, total: 0, spawnTimer: 1, cap: 6, kills: 0
+    spawned: 0, total: 0, spawnTimer: 1, cap: 6, kills: 0,
+    pickupDrop: null, pickupIdx: -1
   };
-  var player, enemies = [], bullets = [], fx = [], texts = [], parts = [], chests = [], walls = [], solid = [];
+  var player, enemies = [], bullets = [], fx = [], texts = [], parts = [], chests = [], drops = [], walls = [], solid = [];
   var keys = {};
   var cardQueue = 0;
   var hudAcc = 0;
@@ -170,7 +216,7 @@
       x: W / 2, y: H / 2 + 26, w: 9, h: 9,
       hp: 100, maxhp: 100, speed: 78, level: 1, xp: 0, xpNext: 8,
       dmgMul: 1, spdMul: 1, armor: 0, xpMul: 1, cdMul: 1,
-      invuln: 0, atkTimer: 0, weapon: 'reaper', moving: false, face: 1, t: 0,
+      invuln: 0, atkTimer: 0, weapon: 'reaper', wpnLvl: 0, moving: false, face: 1, t: 0,
       orbitAng: 0, sawTick: 0
     };
   }
@@ -275,7 +321,8 @@
   }
 
   function fireWeapon() {
-    var w = WEAPONS[player.weapon];
+    var base = WEAPONS[player.weapon];
+    var w = eff(base, player.wpnLvl);
     if (w.type === 'orbit') return;
     var target = nearestEnemy(player.x, player.y, 240);
     if (!target) return;
@@ -290,14 +337,14 @@
         if (d > w.range + e.w / 2) continue;
         var da = Math.abs(Math.atan2(e.y - player.y, e.x - player.x) - ang);
         if (da > Math.PI) da = Math.PI * 2 - da;
-        if (da <= 0.85) hitEnemy(e, dmg);
+        if (da <= w.fanAng) hitEnemy(e, dmg);
       }
       G.shake = Math.max(G.shake, 1.2);
     } else if (w.type === 'bolt') {
       bullets.push({
         team: 'p', x: player.x, y: player.y - 5,
         vx: Math.cos(ang) * w.speed, vy: Math.sin(ang) * w.speed,
-        dmg: dmg, r: 5, life: 1.6, kind: 'bolt'
+        dmg: dmg, r: 5, life: 1.6, kind: 'bolt', pierce: w.pierce || 0
       });
       spark(player.x + Math.cos(ang) * 8, player.y - 5 + Math.sin(ang) * 8, '#79c0c6', 3, 30);
     } else if (w.type === 'fan') {
@@ -318,7 +365,6 @@
       spark(player.x, player.y + 2, '#d9a54b', 8, 70);
       G.shake = Math.max(G.shake, 3.4);
     } else if (w.type === 'beam') {
-      // 沿瞄准方向射出，遇墙截断；命中判定用点到线段距离
       var ex = player.x + Math.cos(ang) * w.range;
       var ey = player.y + Math.sin(ang) * w.range;
       for (var t = 0; t < w.range; t += 4) {
@@ -341,7 +387,7 @@
   /* 环绕锯：固定节奏，对两条锯片附近的敌人结算伤害 */
   function updateSaw(dt) {
     if (player.weapon !== 'saw') return;
-    var w = WEAPONS.saw;
+    var w = eff(WEAPONS.saw, player.wpnLvl);
     player.orbitAng += dt * 4.0;
     player.sawTick -= dt;
     if (player.sawTick > 0) return;
@@ -465,6 +511,10 @@
           var en = enemies[m];
           if (dist(bl.x, bl.y, en.x, en.y - 4) < bl.r + en.w / 2) {
             hitEnemy(en, bl.dmg);
+            if (bl.pierce && bl.pierce > 0) {
+              bl.pierce--;
+              break; // pierce 时本弹只结算一次（避免同一帧同时打一个敌人两次），下帧继续飞
+            }
             bullets.splice(k, 1);
             break;
           }
@@ -483,6 +533,7 @@
       if (ch.open) continue;
       if (dist(player.x, player.y, ch.x, ch.y) < 16) openChest(ch);
     }
+    updateDrops(dt);
 
     // 生成敌人
     if (G.spawned < G.total) {
@@ -528,18 +579,156 @@
     return 'crawler';
   }
 
+  /* 宝箱开启：武器落地，需玩家走上去拾取；落点必须完全在地面瓦片内 */
+  function dropClear(x, y) {
+    for (var oy = -7; oy <= 7; oy += 7) {
+      for (var ox = -7; ox <= 7; ox += 7) {
+        if (isSolid(Math.floor((x + ox) / T), Math.floor((y + oy) / T))) return false;
+      }
+    }
+    return true;
+  }
+
+  function dropSpot(ch) {
+    var offs = [[15, 0], [-15, 0], [0, 17], [0, -17], [12, 12], [-12, 12], [12, -12], [-12, -12]];
+    for (var i = 0; i < offs.length; i++) {
+      var x = ch.x + offs[i][0], y = ch.y + offs[i][1];
+      if (dropClear(x, y)) return { x: x, y: y };
+    }
+    return { x: ch.x, y: ch.y + 6 };
+  }
+
   function openChest(ch) {
     ch.open = true;
-    var pool = WEAPON_IDS.filter(function (id) { return id !== player.weapon; });
-    player.weapon = pool[randInt(pool.length)];
-    toast('拾得武器 · ' + WEAPONS[player.weapon].name + '｜' + WEAPONS[player.weapon].desc);
+    // 过滤玩家武器 + 已在地上的掉落，避免同屏多件同款
+    var pool = WEAPON_IDS.filter(function (id) {
+      if (id === player.weapon) return false;
+      for (var i = 0; i < drops.length; i++) if (drops[i].weapon === id) return false;
+      return true;
+    });
+    if (!pool.length) pool = WEAPON_IDS.filter(function (id) { return id !== player.weapon; });
+    var id = pool[randInt(pool.length)];
+    var sp = dropSpot(ch);
+    drops.push({ x: sp.x, y: sp.y, sx: ch.x, sy: ch.y, tx: sp.x, ty: sp.y, weapon: id, lvl: 0, k: 0, t: rand(6) });
+    toast('宝箱开启 · ' + WEAPONS[id].name + ' 落在附近，走上去选择');
     for (var i = 0; i < 14; i++) {
       parts.push({
         x: ch.x, y: ch.y - 6, vx: (Math.random() - 0.5) * 60, vy: -40 - rand(60),
         t: 0, dur: 0.5 + rand(0.4), col: i % 3 === 0 ? '#d9a54b' : '#f08a4b', s: 1 + (i % 2)
       });
     }
+  }
+
+  /* 走到掉落物上：弹出替换 / 熔炼 / 跳过面板 */
+  function openPickupPanel(dp) {
+    G.pickupDrop = dp;
+    G.pickupIdx = drops.indexOf(dp);
+    G.state = 'pickup';
+    var cur = WEAPONS[player.weapon], dro = WEAPONS[dp.weapon];
+    var curEff = eff(cur, player.wpnLvl), droEff = eff(dro, dp.lvl);
+    var curName = cur.name + (player.wpnLvl ? ' Lv.' + player.wpnLvl : '');
+    var droName = dro.name + (dp.lvl ? ' Lv.' + dp.lvl : '');
+    var curTxt = weaponUpgradeText(cur, player.wpnLvl);
+    var droTxt = weaponUpgradeText(dro, dp.lvl);
+    var meltTxt = weaponUpgradeText(dro, dp.lvl + 1); // 熔炼后 +1 级
+    showOverlay(
+      '<div class="panel wide">' +
+      '<p class="eyebrow">发现武器</p>' +
+      '<h2>' + droName + '</h2>' +
+      '<p class="sub">' + dro.desc + '</p>' +
+      '<div class="compare">' +
+      '<div class="side">' +
+      '<div class="side-head">当前装备</div>' +
+      '<div class="side-name">' + curName + '</div>' +
+      '<div class="side-desc">' + cur.desc + '</div>' +
+      '<div class="side-mod">' + curTxt + '</div>' +
+      '</div>' +
+      '<div class="arrow">vs</div>' +
+      '<div class="side">' +
+      '<div class="side-head">地上</div>' +
+      '<div class="side-name">' + droName + '</div>' +
+      '<div class="side-desc">' + dro.desc + '</div>' +
+      '<div class="side-mod">' + droTxt + '</div>' +
+      '</div>' +
+      '</div>' +
+      '<div class="pickup-actions">' +
+      '<button class="btn" id="btnSwap">替换 · 旧的「' + curName + '」留在地上</button>' +
+      '<button class="btn primary" id="btnMelt">熔炼 · 让「' + curName + '」升到 Lv.' + (player.wpnLvl + 1) + '</button>' +
+      '<button class="btn ghost" id="btnSkip">跳过</button>' +
+      '</div>' +
+      '</div>'
+    );
+    document.getElementById('btnSwap').addEventListener('click', swapPickup);
+    document.getElementById('btnMelt').addEventListener('click', meltPickup);
+    document.getElementById('btnSkip').addEventListener('click', skipPickup);
+    document.getElementById('btnSwap').focus();
+  }
+
+  function swapPickup() {
+    var idx = G.pickupIdx;
+    if (idx < 0 || idx >= drops.length) return closePickup();
+    var dp = drops[idx];
+    // 把当前武器扔到地上，保留原等级
+    drops[idx] = {
+      x: dp.x, y: dp.y, sx: dp.x, sy: dp.y, tx: dp.x, ty: dp.y, // 原位置占位，实际不会显示太久
+      weapon: player.weapon, lvl: player.wpnLvl, k: 1, t: 0
+    };
+    // 再把选中的替换上去（原位置已经被上一条覆盖，需要重新 push 一个来自 chest 附近的？不对，我们直接覆盖掉了）
+    // 更简单的做法：先把当前武器 push 到 drops 末尾，再把 drops[idx] 改成 dp 的武器
+    // (上面的做法会覆盖掉落武器，这里纠正)
+    var curDrop = {
+      x: player.x, y: player.y + 6, sx: player.x, sy: player.y + 6, tx: player.x, ty: player.y + 6,
+      weapon: player.weapon, lvl: player.wpnLvl, k: 1, t: 0
+    };
+    drops.push(curDrop);
+    player.weapon = dp.weapon;
+    player.wpnLvl = dp.lvl;
+    drops.splice(idx, 1);
+    spark(dp.x, dp.y - 4, '#d9a54b', 10, 70);
+    G.shake = Math.max(G.shake, 1.2);
+    toast('换上 ' + WEAPONS[player.weapon].name + ' · Lv.' + player.wpnLvl + '｜旧武器留在地上');
     updateWeaponHud();
+    closePickup();
+  }
+
+  function meltPickup() {
+    var idx = G.pickupIdx;
+    if (idx < 0 || idx >= drops.length) return closePickup();
+    drops.splice(idx, 1);
+    player.wpnLvl++;
+    spark(player.x, player.y - 8, '#f08a4b', 14, 90);
+    G.shake = Math.max(G.shake, 2.5);
+    toast('熔炼成功！当前武器升到 Lv.' + player.wpnLvl);
+    updateWeaponHud();
+    closePickup();
+  }
+
+  function skipPickup() {
+    closePickup();
+  }
+
+  function closePickup() {
+    G.state = 'play';
+    G.pickupDrop = null;
+    G.pickupIdx = -1;
+    hideOverlay();
+  }
+
+  function updateDrops(dt) {
+    for (var i = drops.length - 1; i >= 0; i--) {
+      var dp = drops[i];
+      dp.t += dt;
+      if (dp.k < 1) {
+        dp.k = Math.min(1, dp.k + dt / 0.28);
+        dp.x = dp.sx + (dp.tx - dp.sx) * dp.k;
+        dp.y = dp.sy + (dp.ty - dp.sy) * dp.k;
+        continue;
+      }
+      // 走到掉落物上 → 弹出面板；面板显示期间不再触发
+      if (G.state === 'play' && dist(player.x, player.y, dp.x, dp.y) < 11) {
+        openPickupPanel(dp);
+      }
+    }
   }
 
   function toast(msg) {
@@ -588,6 +777,25 @@
       var pct = clamp(e.hp / e.maxhp, 0, 1);
       window.ART.rect(ctx, e.x - 6, feet + AY - e.h - 5, 12, 2, '#1b1726');
       window.ART.rect(ctx, e.x - 5, feet + AY - e.h - 4, Math.max(1, Math.round(10 * pct)), 1, '#c4513f');
+    }
+  }
+
+  function drawDrop(dp) {
+    var hop = dp.k < 1 ? Math.round(Math.sin(dp.k * Math.PI) * 6) : 0;
+    var bob = dp.k < 1 ? 0 : Math.round(Math.sin(dp.t * 3) * 1.2);
+    shadowUnder(dp.x, dp.y + 6 + AY, 10);
+    if (dp.k >= 1) window.ART.ring(ctx, dp.x, dp.y + 6 + AY, 8, '#d9a54b', dp.t);
+    window.ART.icon(ctx, WEAPONS[dp.weapon].icon, dp.x - 8, dp.y - 8 + AY - hop - bob);
+    if (dp.lvl) {
+      // 等级小牌：图标右下，黄铜底 + 骨白字
+      var lx = dp.x - 8 + AY - 10, ly = dp.y + 6 - hop - bob;
+      window.ART.rect(ctx, lx + 10, ly - 2, 6, 6, '#6b4a24');
+      window.ART.rect(ctx, lx + 11, ly - 1, 4, 4, '#d9a54b');
+      ctx.fillStyle = '#0d0b14';
+      ctx.font = 'bold 5px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('' + dp.lvl, Math.round(dp.x - 8 + 13), Math.round(dp.y - 8 + AY - hop - bob + 14));
+      ctx.textAlign = 'left';
     }
   }
 
@@ -641,6 +849,9 @@
         }
       });
     });
+    drops.forEach(function (dp) {
+      list.push({ y: dp.y + 6, f: function () { drawDrop(dp); } });
+    });
     enemies.forEach(function (e) { list.push({ y: e.y + e.h / 2, f: function () { drawEnemy(e); } }); });
     list.push({ y: player.y + 4.5, f: drawPlayer });
     if (player.weapon === 'saw') list.push({ y: player.y + 5, f: drawBlades });
@@ -693,10 +904,21 @@
   /* ---------------- HUD ---------------- */
   function updateWeaponHud() {
     var w = WEAPONS[player.weapon];
-    wpnName.textContent = w.name;
+    var name = w.name + (player.wpnLvl ? ' Lv.' + player.wpnLvl : '');
+    wpnName.textContent = name;
     var c2 = wpnIcon.getContext('2d');
     c2.clearRect(0, 0, 16, 16);
     window.ART.icon(c2, w.icon, 0, 0);
+    // 左上角等级徽标
+    if (player.wpnLvl) {
+      c2.fillStyle = '#6b4a24';
+      c2.fillRect(0, 0, 7, 7);
+      c2.fillStyle = '#d9a54b';
+      c2.font = 'bold 7px monospace';
+      c2.textAlign = 'center';
+      c2.fillText('' + player.wpnLvl, 3.5, 6);
+      c2.textAlign = 'left';
+    }
   }
 
   function updateHud() {
@@ -732,6 +954,7 @@
     texts.length = 0;
     parts.length = 0;
     chests.length = 0;
+    drops.length = 0;
     buildArena(level);
 
     var n = level >= 3 ? 2 : 1;
@@ -861,6 +1084,13 @@
       if (idx >= 1 && idx <= 3 && offerCards._picks) chooseCard(offerCards._picks[idx - 1]);
       return;
     }
+    if (G.state === 'pickup') {
+      if (k === '1') swapPickup();
+      else if (k === '2') meltPickup();
+      else if (k === '3' || k === 'escape') skipPickup();
+      else if (k === 'enter') meltPickup();
+      return;
+    }
     if (G.state === 'title' && (k === 'enter' || k === ' ')) {
       var b = document.getElementById('btnStart');
       if (b) b.click();
@@ -887,6 +1117,12 @@
     if (G.state === 'play') {
       update(dt);
       hudTick(dt);
+    } else if (G.state === 'pickup') {
+      // 冻结战斗，但让粒子/掉落动画等继续一点，避免完全僵死
+      G.t += dt;
+      for (var fi = fx.length - 1; fi >= 0; fi--) { fx[fi].t += dt; if (fx[fi].t > fx[fi].dur) fx.splice(fi, 1); }
+      for (var pi = parts.length - 1; pi >= 0; pi--) { var p = parts[pi]; p.t += dt; p.y += p.vy * dt; if (p.t > p.dur) parts.splice(pi, 1); }
+      hudTick(dt);
     }
     render();
     requestAnimationFrame(frame);
@@ -906,7 +1142,7 @@
       '<li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向键：走位</li>' +
       '<li>攻击全自动，你只负责不被击中</li>' +
       '<li><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>：升级三选一</li>' +
-      '<li>走到宝箱上：更换武器与攻击模式</li>' +
+      '<li>走到宝箱上开启：武器落在地上，走上去更换，旧武器丢弃</li>' +
       '</ul>' +
       '<button class="btn primary" id="btnStart">开始巡礼</button>' +
       '<a class="link" href="art-bible.html">先看美术圣经 →</a>' +
