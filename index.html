@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2DRougeNew · 守灯人回廊</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main id="wrap">
+  <div id="stage">
+    <canvas id="game" width="480" height="284" aria-label="游戏画面：俯视像素风回廊"></canvas>
+
+    <div id="hud">
+      <div class="hud-col">
+        <div class="bar hp" id="hpBar" role="progressbar" aria-label="生命值" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+          <div class="fill" id="hpFill"></div>
+          <span class="bar-label" id="hpText">100 / 100</span>
+        </div>
+        <div class="bar xp" role="progressbar" aria-label="经验" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="fill" id="xpFill"></div>
+        </div>
+      </div>
+      <div class="hud-col right">
+        <span class="chip" id="lvlChip">Lv.1</span>
+        <span class="chip weapon">
+          <canvas id="wpnIcon" width="16" height="16" aria-hidden="true"></canvas>
+          <b id="wpnName">钟摆刃</b>
+        </span>
+        <span class="chip" id="foeChip">剩余 0</span>
+        <span class="chip floor" id="floorChip">第 1 层</span>
+      </div>
+    </div>
+
+    <div id="flash" aria-hidden="true"></div>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <div id="overlay" class="overlay"></div>
+  </div>
+
+  <p class="foot">
+    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向键移动 · 攻击全自动 · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 选卡 ·
+    <a href="art-bible.html">美术圣经</a>
+  </p>
+</main>
+
+<script src="js/palette.js"></script>
+<script src="js/pixels.js"></script>
+<script src="js/art.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

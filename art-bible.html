@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2DRougeNew · 美术圣经 v1.0</title>
+<link rel="stylesheet" href="bible.css">
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <p class="eyebrow">2DRougeNew · Art Bible v1.0</p>
+    <h1>守灯人回廊</h1>
+    <p class="lede">
+      一句话视觉命题：<b>冷石回廊里，一个提着灯的人，用黄铜与余烬清场。</b>
+      全局视觉语言为斜俯视、瓦片式像素美术；同一套网格、比例、色阶与光照规则贯穿角色、环境、道具、UI、图标、特效与宣传图。
+    </p>
+    <div class="hero-meta">
+      <span>瓦片 16×16</span>
+      <span>逻辑分辨率 480×284</span>
+      <span>固定单屏镜头</span>
+      <span>PC 网页 · 键鼠</span>
+      <a href="index.html">← 返回可玩原型</a>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#assume">假设</a>
+  <a href="#palette">调色板</a>
+  <a href="#space">空间语法</a>
+  <a href="#silhouette">剪影与比例</a>
+  <a href="#material">材质与光照</a>
+  <a href="#ui">UI 与图标</a>
+  <a href="#motion">动效</a>
+  <a href="#spec">资产规格</a>
+  <a href="#avoid">错误清单</a>
+  <a href="#okr">OKR</a>
+</nav>
+
+<main>
+
+<section id="assume" class="card">
+  <header class="sec-head">
+    <span class="num">00</span>
+    <h2>项目假设</h2>
+    <p>原始需求未指定的项，先假设再出资产；后续若变更，先改这里再改资产。</p>
+  </header>
+  <div class="grid2">
+    <ul class="rules">
+      <li><b>类型</b>：自动攻击的生存 Roguelike（俯视、单层清场）。</li>
+      <li><b>镜头</b>：固定单屏，无滚动、无旋转；一屏即一层。</li>
+      <li><b>平台</b>：PC 网页，键盘 WASD / 方向键，鼠标只用于点卡片。</li>
+      <li><b>分辨率</b>：逻辑 480×284，整数倍缩放（2×/3×/4×），不出现半像素。</li>
+    </ul>
+    <ul class="rules">
+      <li><b>输入</b>：玩家只控制移动；攻击、瞄准、拾取全自动。</li>
+      <li><b>可读性</b>：实际显示尺寸下，危险预警必须先于装饰被看见。</li>
+      <li><b>原创性</b>：角色、标识、构图、色板均为本项目原创，不参照任何具体游戏的角色或 Logo。</li>
+      <li><b>复用</b>：单资产请求也必须落在本文件的网格与色板内，不为单次请求改风格。</li>
+    </ul>
+  </div>
+</section>
+
+<section id="palette" class="card">
+  <header class="sec-head">
+    <span class="num">01</span>
+    <h2>锁定调色板 · 22 色</h2>
+    <p>7 个色族，每个色族自带明度阶梯。新增颜色必须先进入 <code>js/palette.js</code>，再进入本表。</p>
+  </header>
+  <div id="palette" class="palette"></div>
+  <p class="note">
+    配额：石板约 60%，角色/道具 30%，强调色（灯芯青、黄铜、余烬）合计 10%。
+    禁止纯黑纯白：最深用 <code>ink</code>，最亮用 <code>bone1</code>。
+    灯芯青只表示“与玩家有关”，余烬只表示“会造成伤害”。
+  </p>
+</section>
+
+<section id="space" class="card">
+  <header class="sec-head">
+    <span class="num">02</span>
+    <h2>空间语法</h2>
+    <p>斜俯视：地面完整可见，墙体露出正立面，角色直立。全项目只有这一种视角。</p>
+  </header>
+  <div class="figure">
+    <canvas id="scene" width="240" height="160"></canvas>
+    <span class="anno" style="left:3%;top:28%">矮墙抬高 10px</span>
+    <span class="anno" style="left:44%;top:28%">正立面朝下 · 可读</span>
+    <span class="anno" style="left:62%;top:50%">光 NW → 投影 SE</span>
+    <span class="anno" style="left:70%;top:86%">遮挡按脚底 y 排序</span>
+    <span class="anno" style="left:3%;top:64%">地面 0px · 完整可见</span>
+  </div>
+  <div class="grid2">
+    <ul class="rules">
+      <li>瓦片 16×16；一屏 30×15 格，边界恒为一格厚墙。</li>
+      <li>高度阶梯：地面 <b>0</b> → 台阶 <b>4</b> → 矮墙 <b>10</b> → 立柱 <b>16</b>（像素）。</li>
+      <li>墙的顶面整体上移墙高值，正立面朝屏幕下方，永远可见。</li>
+      <li>阴影方向恒定：光源在左上，投影落在右下与正下方。</li>
+    </ul>
+    <ul class="rules">
+      <li>绘制顺序只看脚底 y：y 大者后画、压住 y 小者。</li>
+      <li>相邻同高墙段合并为一条水平段，禁止逐格描边形成网格噪点。</li>
+      <li>碰撞体小于脚下阴影 1-2px，保证“看着能过就能过”。</li>
+      <li>禁止在同一画面混用 45° 等距、正面平视与其他透视。</li>
+    </ul>
+  </div>
+  <div class="ladder" aria-label="高度阶梯示意">
+    <div class="step"><i style="height:2px"></i><b>地面 0</b></div>
+    <div class="step"><i style="height:6px"></i><b>台阶 4</b></div>
+    <div class="step"><i style="height:14px"></i><b>矮墙 10</b></div>
+    <div class="step"><i style="height:22px"></i><b>立柱 16</b></div>
+  </div>
+</section>
+
+<section id="silhouette" class="card">
+  <header class="sec-head">
+    <span class="num">03</span>
+    <h2>剪影与比例</h2>
+    <p>所有角色直立、脚底锚点、1px 墨色轮廓。把画面压成全黑时，仍能仅凭轮廓区分敌我与敌种。</p>
+  </header>
+  <div id="sprites" class="sprite-grid"></div>
+  <ul class="rules two-col">
+    <li>玩家身高 16px = 1 瓦片；肩宽 12px，永不超出 1 格。</li>
+    <li>杂兵 12×12，重甲 14×14：比玩家矮，读起来更“可被处理”。</li>
+    <li>内部细节不得细于 1px；同一区域最多 3 级明度，避免脏。</li>
+    <li>每种敌人只保留一个剪影记忆点：蠕行者=横向张开的腿，灯蛾=上半部光核，冲锋者=双角。</li>
+  </ul>
+</section>
+
+<section id="material" class="card">
+  <header class="sec-head">
+    <span class="num">04</span>
+    <h2>材质与光照</h2>
+    <p>材质靠“色阶 + 边缘处理”区分，不靠纹理贴图。光照分 5 层，越靠上越克制。</p>
+  </header>
+  <div class="mat-row">
+    <div id="materials" class="mat-grid"></div>
+    <ol class="light-stack">
+      <li><b>L0 环境</b>：石板平涂，无渐变。</li>
+      <li><b>L1 接触阴影</b>：脚下 1–2px 墨色，所有实体必有。</li>
+      <li><b>L2 投影</b>：墙下方 5px 半透明，只落在右下。</li>
+      <li><b>L3 局部光</b>：玩家灯笼，青色低透明度加色，半径约 3 格。</li>
+      <li><b>L4 自发光</b>：弹丸、余烬、宝箱开启，允许用 <code>bone1</code> 最亮色。</li>
+    </ol>
+  </div>
+  <p class="note">不用高斯模糊、不用外发光滤镜、不用 2px 以上的羽化；柔光只能由低透明度色块叠加产生。</p>
+</section>
+
+<section id="ui" class="card">
+  <header class="sec-head">
+    <span class="num">05</span>
+    <h2>UI 与图标规则</h2>
+    <p>像素世界与原生命中文字分离：世界在低分辨率画布上放大，文字始终在原生分辨率渲染。</p>
+  </header>
+  <div id="icons" class="icon-grid"></div>
+  <div class="grid2">
+    <ul class="rules">
+      <li>图标 16×16、1px 墨色描边、最多 4 色，缩放只能用整数倍。</li>
+      <li>中文不使用像素字体：系统字体，实际显示 ≥ 14px。</li>
+      <li>正文与底色对比度 ≥ 4.5:1；生命条同时给出数字，不只靠颜色。</li>
+      <li>可点击目标 ≥ 44×44 实际像素；卡片支持 <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 与回车。</li>
+    </ul>
+    <ul class="rules">
+      <li>HUD 只占顶部一条，不遮挡战斗区（画布上沿预留 44px）。</li>
+      <li>经验条用灯芯青，生命条用余烬红，两者永不复用为其他信息色。</li>
+      <li>图标语义固定：刃=近战弧、芯=直线弹、扇=散射、锤=范围冲击、锯=环绕切割、棱=贯穿光束；心=生命、盾=减伤。</li>
+      <li>所有即时提示同步到 <code>aria-live</code>，色盲玩家仍可获得信息。</li>
+    </ul>
+  </div>
+</section>
+
+<section id="motion" class="card">
+  <header class="sec-head">
+    <span class="num">06</span>
+    <h2>动效指南</h2>
+    <p>动画在既定网格内完成：位移取整、脚底不漂移、前摇必须比命中更早被看见。</p>
+  </header>
+  <table class="tbl">
+    <thead><tr><th>动作</th><th>时长</th><th>位移 / 变化</th><th>规则</th></tr></thead>
+    <tbody>
+      <tr><td>待机呼吸</td><td>0.5s 循环</td><td>纵向 1px</td><td>两帧交替，脚底不动</td></tr>
+      <tr><td>行走</td><td>0.24s / 循环</td><td>腿部 2 帧</td><td>不缩放角色，不做位移动画</td></tr>
+      <tr><td>近战挥砍</td><td>0.22s</td><td>弧线半径 34px</td><td>前 0.06s 为可读前摇</td></tr>
+      <tr><td>钟锤冲击</td><td>0.34s</td><td>环半径 10→44px</td><td>外圈黄铜、内圈余烬，不填满</td></tr>
+      <tr><td>灯塔棱光</td><td>0.20s</td><td>射程 210px</td><td>遇墙截断，命中点留青色火花</td></tr>
+      <tr><td>齿环锯</td><td>0.32s / 次</td><td>轨道半径 27px</td><td>按象限翻转锯片朝向来表现旋转</td></tr>
+      <tr><td>受击闪白</td><td>0.09s</td><td>整剪影替换为骨白</td><td>不改轮廓，只改填充</td></tr>
+      <tr><td>死亡碎裂</td><td>0.35s</td><td>6–9 粒，向外 9px</td><td>粒子颜色取自该敌人色族</td></tr>
+      <tr><td>冲刺预警</td><td>0.65s</td><td>余烬色环脉冲</td><td>预警先于冲刺，绝不省略</td></tr>
+      <tr><td>宝箱开启</td><td>2 帧 + 0.5s 粒子</td><td>箱盖开合</td><td>提示文字用 DOM，不缩放</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="spec" class="card">
+  <header class="sec-head">
+    <span class="num">07</span>
+    <h2>资产规格</h2>
+    <p>以逻辑像素为单位；导出时统一 ×4（仅 1× 源用于像素级校对）。</p>
+  </header>
+  <table class="tbl">
+    <thead><tr><th>资产</th><th>逻辑尺寸</th><th>锚点</th><th>帧</th><th>导出</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>玩家 · 巡礼守灯人</td><td>12×16</td><td>脚底中心</td><td>2</td><td>×4</td><td>骨白斗篷 + 灯芯青腰灯</td></tr>
+      <tr><td>蠕行者（近战）</td><td>12×12</td><td>脚底中心</td><td>2</td><td>×4</td><td>苔绿色，横向张腿</td></tr>
+      <tr><td>灯蛾（远程）</td><td>12×12</td><td>脚底中心</td><td>2</td><td>×4</td><td>灯芯青主体，余烬口器</td></tr>
+      <tr><td>铜角冲锋者（重甲）</td><td>14×14</td><td>脚底中心</td><td>1</td><td>×4</td><td>冲刺前摇用程序化环</td></tr>
+      <tr><td>宝箱</td><td>14×12</td><td>脚底中心</td><td>2</td><td>×4</td><td>关 / 开两帧</td></tr>
+      <tr><td>地面瓦片</td><td>16×16</td><td>左上角</td><td>6 变体</td><td>×4</td><td>含苔痕与裂缝变体，可平铺</td></tr>
+      <tr><td>墙体瓦片</td><td>16×26 / 16×32</td><td>左上角</td><td>2</td><td>×4</td><td>矮墙 10px / 立柱 16px 抬升</td></tr>
+      <tr><td>弹丸</td><td>6×6</td><td>中心</td><td>2</td><td>×4</td><td>灯芯弹 / 余烬弹</td></tr>
+      <tr><td>图标</td><td>16×16</td><td>左上角</td><td>12</td><td>×1</td><td>武器 6 + 属性 6</td></tr>
+      <tr><td>HUD 文字</td><td>原生 px</td><td>—</td><td>—</td><td>—</td><td>系统字体，实际 ≥ 14px</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="avoid" class="card">
+  <header class="sec-head">
+    <span class="num">08</span>
+    <h2>应避免的视觉错误</h2>
+    <p>这八条是评审时最先退回的问题，出现任意一条即视为不合规。</p>
+  </header>
+  <ol class="bad">
+    <li>同屏混用等距与正交俯视，楼板与立面互相打架。</li>
+    <li>墙只有顶面、没有正立面，玩家读不出高度与遮挡。</li>
+    <li>给像素边缘加模糊、渐变或外发光，破坏像素密度。</li>
+    <li>角色身高与瓦片脱节，脚底不落在格线上，走位像在滑行。</li>
+    <li>碰撞体与脚下阴影不一致：看着能过却卡住，或穿过墙角。</li>
+    <li>引入调色板外的颜色，尤其是纯黑、纯白和高饱和荧光色。</li>
+    <li>用中文像素字或把 8px 文字拉伸放大，导致不可读。</li>
+    <li>宝箱、弹丸、危险预警共用同一强调色，信息优先级失效。</li>
+  </ol>
+</section>
+
+<section id="okr" class="card">
+  <header class="sec-head">
+    <span class="num">09</span>
+    <h2>个人 OKR</h2>
+    <p>周期 2026 Q4。O 回答“要去哪”，KR 只写外部能验证的结果；每两周更新“现状”，季度末才允许改目标。</p>
+  </header>
+
+  <div class="okr">
+    <div class="okr-head">
+      <span class="okr-o">O1</span>
+      <h3>把「守灯人回廊」从可玩原型推到可对外试玩的完整版本</h3>
+      <span class="okr-w">权重 60%</span>
+    </div>
+    <table class="tbl">
+      <thead><tr><th>KR</th><th>结果描述</th><th>现状 → 目标</th><th>进度</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>KR1</td>
+          <td>内容量：武器 6 → 9，敌人 3 → 6（近战 / 远程 / 突进各补一档），每把新武器有专属攻击模式与特效</td>
+          <td>6 把武器、3 种敌人 → 9 / 6</td>
+          <td><span class="bar"><i style="width:60%"></i></span>60%</td>
+        </tr>
+        <tr>
+          <td>KR2</td>
+          <td>关卡结构：无限循环 → 5 层递进 + 1 个 Boss 层，单局时长 8–12 分钟，Boss 具备 3 段式攻击</td>
+          <td>单层循环 → 5 + 1 层</td>
+          <td><span class="bar"><i style="width:0%"></i></span>0%</td>
+        </tr>
+        <tr>
+          <td>KR3</td>
+          <td>稳定性与性能：连续 20 局无控制台报错、无卡死；单帧耗时 &gt; 50ms 的次数为 0；首屏可玩 &lt; 1.5s</td>
+          <td>6 局无报错 → 20 局</td>
+          <td><span class="bar"><i style="width:30%"></i></span>30%</td>
+        </tr>
+        <tr>
+          <td>KR4</td>
+          <td>美术一致性：抽查 10 项资产，100% 落在 22 色板与 16px 网格内；错误清单 8 条命中 0</td>
+          <td>未系统抽查 → 10 / 10 通过</td>
+          <td><span class="bar"><i style="width:0%"></i></span>0%</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="okr">
+    <div class="okr-head">
+      <span class="okr-o">O2</span>
+      <h3>让美术圣经成为可复用的生产工具，而不是一次性文档</h3>
+      <span class="okr-w">权重 40%</span>
+    </div>
+    <table class="tbl">
+      <thead><tr><th>KR</th><th>结果描述</th><th>现状 → 目标</th><th>进度</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>KR1</td>
+          <td>图集导出：6 类精灵输出 ×4 PNG + JSON 元数据，一条命令可重跑，0 手工修图</td>
+          <td>仅运行时烘焙 → 可导出</td>
+          <td><span class="bar"><i style="width:0%"></i></span>0%</td>
+        </tr>
+        <tr>
+          <td>KR2</td>
+          <td>规格覆盖率：每项资产都有尺寸、锚点、帧数、导出倍率四栏，覆盖率 100%</td>
+          <td>10 类资产 / 规格表</td>
+          <td><span class="bar"><i style="width:90%"></i></span>90%</td>
+        </tr>
+        <tr>
+          <td>KR3</td>
+          <td>评审效率：单次资产评审 ≤ 10 分钟，以错误清单 8 条为统一 Checklist，返工率 &lt; 20%</td>
+          <td>无固定流程 → 有 Checklist</td>
+          <td><span class="bar"><i style="width:50%"></i></span>50%</td>
+        </tr>
+        <tr>
+          <td>KR4</td>
+          <td>外部验证：3 位同行试玩并回收 ≥ 5 条可落地反馈，其中至少 3 条进入下个迭代</td>
+          <td>0 位 → 3 位</td>
+          <td><span class="bar"><i style="width:0%"></i></span>0%</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="note">
+    复盘口径：KR 完成度按“可验证结果”记，不按投入时间记；单项低于 70% 视为未达成，须在下一周期写一句原因与调整。
+    两条 O 合计权重 100%，任一 O 达成即算季度及格，两条全达成才计入超额。
+  </p>
+</section>
+
+</main>
+
+<footer class="foot">
+  <p>2DRougeNew · 美术圣经 v1.0 · 与本项目的 <a href="index.html">可玩原型</a> 共用同一套 <code>palette.js / pixels.js / art.js</code>，文档与实机不会漂移。</p>
+</footer>
+
+<script src="js/palette.js"></script>
+<script src="js/pixels.js"></script>
+<script src="js/art.js"></script>
+<script src="js/bible.js"></script>
+</body>
+</html>
